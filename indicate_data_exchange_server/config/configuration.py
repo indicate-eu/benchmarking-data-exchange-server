@@ -23,28 +23,32 @@ def load_configuration(config_file: str = ".env") -> Configuration:
 
     load_dotenv(config_file)
 
-    # Create a dictionary from environment variables
-    config_dict = {
-        "database": {
-            "host": os.getenv("DATABASE_HOST"),
-            "password": os.getenv("DATABASE_PASSWORD"),
-        },
-    }
-
+    args = {}
     def maybe_from_env(key, variable_name, transform=None):
         value = os.getenv(variable_name)
-        if value:
+        if value is None:
+            filename = os.getenv(f"{variable_name}_FILE")
+            if filename is not None:
+                with open(filename) as file:
+                    value = file.read().strip()
+
+        if value is not None:
             if transform:
                 value = transform(value)
-            container = config_dict
-            if isinstance(key, Sequence):
+            container = args
+            if isinstance(key, tuple):
                 for step in key[:-1]:
+                    if step not in container:
+                        container[step] = {}
                     container = container[step]
                 key = key[-1]
             container[key] = value
+
+    maybe_from_env(("database", "host"), "DATABASE_HOST")
     maybe_from_env(("database", "port"), "DATABASE_PORT", int)
-    maybe_from_env(("database", "user"), "DATABASE_USER")
     maybe_from_env(("database", "database"), "DATABASE_NAME")
+    maybe_from_env(("database", "user"), "DATABASE_USER")
+    maybe_from_env(("database", "password"), "DATABASE_PASSWORD")
     maybe_from_env(("database", "dbschema"), "DATABASE_SCHEMA")
 
-    return Configuration(**config_dict)
+    return Configuration(**args)
